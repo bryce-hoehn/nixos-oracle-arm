@@ -10,7 +10,7 @@
   };
 
   outputs = { self, nixpkgs, nixos-generators, ... }: {
-    packages.aarch64-linux.oci-arm64 = nixos-generators.lib.nixosGenerate {
+    packages.aarch64-linux.oci-arm64 = nixos-generators.nixosGenerate {
       pkgs = nixpkgs.legacyPackages.aarch64-linux;
       
       modules = [
