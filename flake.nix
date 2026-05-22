@@ -21,7 +21,7 @@
         ({ pkgs, ... }: {
           nixpkgs.hostPlatform = "aarch64-linux";
           networking.useDHCP = nixpkgs.lib.mkForce true;
-          networking.predictableInterfaceNames = true;
+          networking.usePredictableInterfaceNames = true;
 
           environment.etc = {
             "nixos/flake.nix".text = builtins.readFile ./nixos/flake.nix;
