@@ -15,7 +15,7 @@
       format = "qcow2";
 
       modules = [
-        "${nixpkgs}/nixos/modules/virtualisation/oracle-compute-config.nix"
+        "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
         ./nixos/configuration.nix
 
         ({ pkgs, ... }: {
