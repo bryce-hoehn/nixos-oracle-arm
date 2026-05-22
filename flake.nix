@@ -13,8 +13,8 @@
     packages.x86_64-linux.oci-arm64 = nixos-generators.lib.nixosGenerate {
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
       modules = [
-        "${nixpkgs}/nixos/modules/virtualisation/oracle-compute-config.nix"
-        
+        "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
+
         ({ pkgs, ... }: {
           nixpkgs.hostPlatform = "aarch64-linux";
           networking.useDHCP = nixpkgs.lib.mkForce true;
