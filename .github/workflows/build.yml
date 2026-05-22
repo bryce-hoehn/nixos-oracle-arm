@@ -1,0 +1,33 @@
+name: Build NixOS OCI ARM64 Image
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up QEMU for ARM64 Emulation
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@v25
+      with:
+        extra_nix_config: |
+          extra-platforms = aarch64-linux
+          experimental-features = nix-command flakes
+
+    - name: Build QCOW2 Image
+      run: |
+        nix build .#oci-arm64 --print-build-logs
+
+    - name: Upload Image Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nixos-oci-arm64-qcow2
+        path: result/
