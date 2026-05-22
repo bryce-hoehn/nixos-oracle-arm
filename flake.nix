@@ -12,7 +12,8 @@
   outputs = { self, nixpkgs, nixos-generators, ... }: {
     packages.aarch64-linux.oci-arm64 = nixos-generators.nixosGenerate {
       pkgs = nixpkgs.legacyPackages.aarch64-linux;
-      
+      format = "qcow2";
+
       modules = [
         "${nixpkgs}/nixos/modules/virtualisation/oracle-compute-config.nix"
         ./nixos/configuration.nix
@@ -29,7 +30,6 @@
           };
         })
       ];
-      format = "qcow2";
     };
   };
 }
