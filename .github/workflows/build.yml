@@ -21,35 +21,30 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm64
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
     - name: Dynamically Update Configuration Files
       run: |
-        echo "Injecting parameters directly into target files..."
+        echo "Injecting parameters via persistent placeholders..."
         
-        # 1. Update Target configuration.nix in /nixos
-        sed -i 's/networking.hostName = ".*";/networking.hostName = "${{ github.event.inputs.hostname }}";/' nixos/configuration.nix
-        sed -i 's/time.timeZone = ".*";/time.timeZone = "${{ github.event.inputs.timezone }}";/' nixos/configuration.nix
-        sed -i 's/users.users.opc/users.users.${{ github.event.inputs.username }}/' nixos/configuration.nix
-        sed -i 's/description = ".*";/description = "${{ github.event.inputs.username }} Admin User";/' nixos/configuration.nix
-        sed -i '/"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...your_key_here..."/c\      "${{ github.event.inputs.ssh_key }}"' nixos/configuration.nix
+        # 1. Update Target configuration.nix in /nixos via comment targeting
+        sed -i '/# TARGET_HOSTNAME/c\  networking.hostName = "${{ github.event.inputs.hostname }}"; # TARGET_HOSTNAME' nixos/configuration.nix
+        sed -i '/# TARGET_TIMEZONE/c\  time.timeZone = "${{ github.event.inputs.timezone }}"; # TARGET_TIMEZONE' nixos/configuration.nix
+        sed -i '/# TARGET_USERNAME/c\    user = "${{ github.event.inputs.username }}"; # TARGET_USERNAME' nixos/configuration.nix
+        sed -i '/# TARGET_DESCRIPTION/c\      description = "${{ github.event.inputs.username }} Admin User"; # TARGET_DESCRIPTION' nixos/configuration.nix
+        sed -i '/# TARGET_SSH_KEY/c\        "${{ github.event.inputs.ssh_key }}" # TARGET_SSH_KEY' nixos/configuration.nix
         
-        # 2. Sync target flake hostname configuration mapping
-        sed -i 's/nixosConfigurations.oci-nixos-arm/nixosConfigurations.${{ github.event.inputs.hostname }}/' nixos/flake.nix
-
-    - name: Set up QEMU for ARM64 Emulation
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: arm64
+        # 2. Update Target flake.nix using the line immediately following our anchor comment
+        # This locates the comment line, moves to the next line, and substitutes the configuration block safely
+        sed -i '/# TARGET_FLAKE_CONFIG/{n;s/nixosConfigurations\.[a-zA-Z0-9_-]*/nixosConfigurations.${{ github.event.inputs.hostname }}/}' nixos/flake.nix
 
     - name: Install Nix
       uses: cachix/install-nix-action@v25
       with:
         extra_nix_config: |
-          extra-platforms = aarch64-linux
           experimental-features = nix-command flakes
 
     - name: Build QCOW2 Image
