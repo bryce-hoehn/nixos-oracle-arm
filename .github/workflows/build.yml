@@ -1,7 +1,23 @@
-name: Build NixOS OCI ARM64 Image
+name: Build Custom NixOS OCI ARM64 Image
 
 on:
   workflow_dispatch:
+    inputs:
+      username:
+        description: 'Admin username'
+        required: true
+        default: 'opc'
+      hostname:
+        description: 'System hostname'
+        required: true
+        default: 'oci-nixos-arm'
+      timezone:
+        description: 'System timezone'
+        required: true
+        default: 'UTC'
+      ssh_key:
+        description: 'SSH Public Key'
+        required: true
 
 jobs:
   build:
@@ -9,6 +25,20 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Dynamically Update Configuration Files
+      run: |
+        echo "Injecting parameters directly into target files..."
+        
+        # 1. Update Target configuration.nix in /nixos
+        sed -i 's/networking.hostName = ".*";/networking.hostName = "${{ github.event.inputs.hostname }}";/' nixos/configuration.nix
+        sed -i 's/time.timeZone = ".*";/time.timeZone = "${{ github.event.inputs.timezone }}";/' nixos/configuration.nix
+        sed -i 's/users.users.opc/users.users.${{ github.event.inputs.username }}/' nixos/configuration.nix
+        sed -i 's/description = ".*";/description = "${{ github.event.inputs.username }} Admin User";/' nixos/configuration.nix
+        sed -i '/"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...your_key_here..."/c\      "${{ github.event.inputs.ssh_key }}"' nixos/configuration.nix
+        
+        # 2. Sync target flake hostname configuration mapping
+        sed -i 's/nixosConfigurations.oci-nixos-arm/nixosConfigurations.${{ github.event.inputs.hostname }}/' nixos/flake.nix
 
     - name: Set up QEMU for ARM64 Emulation
       uses: docker/setup-qemu-action@v3
