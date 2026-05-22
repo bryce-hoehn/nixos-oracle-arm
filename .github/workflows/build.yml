@@ -42,10 +42,7 @@ jobs:
         sed -i '/# TARGET_FLAKE_CONFIG/{n;s/nixosConfigurations\.[a-zA-Z0-9_-]*/nixosConfigurations.${{ github.event.inputs.hostname }}/}' nixos/flake.nix
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v25
-      with:
-        extra_nix_config: |
-          experimental-features = nix-command flakes
+      uses: DeterminateSystems/nix-installer-action@main
 
     - name: Build QCOW2 Image
       run: |
