@@ -3,6 +3,7 @@
 {
   imports = [
     ./hardware-configuration.nix
+    (modulesPath + "/virtualisation/oracle-compute-config.nix")
   ];
 
   boot.loader.systemd-boot.enable = true;
