@@ -3,7 +3,7 @@
 {
   imports = [
     ./hardware-configuration.nix
-    (modulesPath + "/virtualisation/oracle-compute-config.nix")
+    (modulesPath + "/virtualisation/oci-image.nix")
   ];
 
   boot.loader.systemd-boot.enable = true;
