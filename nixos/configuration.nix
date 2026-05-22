@@ -25,7 +25,7 @@
       description = "${user} Admin User"; # TARGET_DESCRIPTION
       extraGroups = [ "networkmanager" "wheel" ];
       openssh.authorizedKeys.keys = [
-        "ssh-ed25519 placeholdersshkey..." # TARGET_SSH_KEY
+        "" # TARGET_SSH_KEY
       ];
     };
   };
