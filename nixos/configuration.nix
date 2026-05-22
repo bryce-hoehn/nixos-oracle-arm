@@ -9,21 +9,27 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  networking.hostName = "oci-nixos-arm";
-  time.timeZone = "UTC";
+  networking.hostName = "oci-nixos-arm"; # TARGET_HOSTNAME
+  time.timeZone = "UTC"; # TARGET_TIMEZONE
   i18n.defaultLocale = "en_US.UTF-8";
 
   services.openssh.enable = true;
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-  users.users.opc = {
-    isNormalUser = true;
-    description = "Oracle Cloud User";
-    extraGroups = [ "networkmanager" "wheel" ];
-    openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI...your_key_here..."
-    ];
+  # Dynamic user block wrapper
+  users.users = let 
+    user = "opc"; # TARGET_USERNAME
+  in {
+    "${user}" = {
+      isNormalUser = true;
+      description = "${user} Admin User"; # TARGET_DESCRIPTION
+      extraGroups = [ "networkmanager" "wheel" ];
+      openssh.authorizedKeys.keys = [
+        "ssh-ed25519 placeholdersshkey..." # TARGET_SSH_KEY
+      ];
+    };
   };
+
   security.sudo.wheelNeedsPassword = false;
 
   system.stateVersion = "24.05";
