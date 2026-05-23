@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Dynamically Update Configuration Files
       run: |
@@ -52,7 +52,7 @@ jobs:
         nix build .#oci-arm64 --print-build-logs
 
     - name: Upload Image Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: nixos-oci-arm64-qcow2
         path: result/
