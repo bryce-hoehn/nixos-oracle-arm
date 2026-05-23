@@ -1,6 +1,8 @@
 name: Build Custom NixOS OCI ARM64 Image
 
 on:
+  schedule:
+    - cron: '00 03 * * 1'
   workflow_dispatch:
     inputs:
       username:
@@ -51,8 +53,13 @@ jobs:
       run: |
         nix build .#oci-arm64 --print-build-logs
 
-    - name: Upload Image Artifact
-      uses: actions/upload-artifact@v7
+    - name: Get date
+      run: |
+        echo "DATE=$(date --rfc-3339=date)" >> ${GITHUB_ENV}
+    
+    - name: Release
+      uses: softprops/action-gh-release@v3
+      if: github.ref_type == 'tag'
       with:
-        name: nixos-oci-arm64-qcow2
-        path: result/
+        files: nixos-oci-arm64-qcow2.zip
+        tag_name: v${{env.DATE}}
