@@ -38,6 +38,6 @@
           ];
         };
       in
-      systemConfig.config.system.build.images.qcow2; 
+      systemConfig.config.system.build.image;
   };
 }
