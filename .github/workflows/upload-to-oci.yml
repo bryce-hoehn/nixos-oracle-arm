@@ -67,9 +67,10 @@ jobs:
             FILENAME=$(basename "$FILE")
 
             echo "Uploading ${FILENAME} -> s3://${BUCKET}/${FILENAME}"
-            aws s3 cp "$FILE" "s3://${BUCKET}/${FILENAME}" \
-              --endpoint-url "$ENDPOINT" \
-              --no-progress
+              aws s3 cp "$FILE" "s3://${BUCKET}/${FILENAME}" \
+                --endpoint-url "$ENDPOINT" \
+                --no-progress \
+                --no-multipart
           done
 
           echo "Upload complete."
