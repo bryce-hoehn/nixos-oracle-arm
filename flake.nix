@@ -3,41 +3,42 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    nixos-generators = {
-      url = "github:nix-community/nixos-generators";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = { self, nixpkgs, nixos-generators, ... }: {
-    packages.aarch64-linux.oracle = nixos-generators.nixosGenerate {
-      pkgs = nixpkgs.legacyPackages.aarch64-linux;
-      format = "qcow";
+  outputs = { self, nixpkgs, ... }: {
+    packages.aarch64-linux.oracle = 
+      let
+        # Build the configuration using native nixpkgs libraries
+        systemConfig = nixpkgs.lib.nixosSystem {
+          modules = [
+            "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
+            ./nixos/configuration.nix
 
-      modules = [
-        "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
-        ./nixos/configuration.nix
+            ({ pkgs, lib, ... }: {
+              services.cloud-init.enable = true;
 
-        ({ pkgs, ... }: {
-          nixpkgs.overlays = [
-            (final: prev: {
-              # This strips the "kvm" requirement from the final disk image generator derivation
-              nixos-disk-image = prev.nixos-disk-image.overrideAttrs (oldAttrs: {
-                requiredSystemFeatures = [ ];
-              });
+              nixpkgs.overlays = [
+                (final: prev: {
+                  # Strips the "kvm" requirement so it compiles cleanly on non-KVM ARM64 runners
+                  nixos-disk-image = prev.nixos-disk-image.overrideAttrs (oldAttrs: {
+                    requiredSystemFeatures = [ ];
+                  });
+                })
+              ];
+
+              nixpkgs.hostPlatform = "aarch64-linux";
+              networking.useDHCP = lib.mkForce true;
+              networking.usePredictableInterfaceNames = true;
+
+              environment.etc = {
+                "nixos/flake.nix".text = builtins.readFile ./flake.nix;
+                "nixos/configuration.nix".text = builtins.readFile ./nixos/configuration.nix;
+                "nixos/hardware-configuration.nix".text = builtins.readFile ./nixos/hardware-configuration.nix;
+              };
             })
           ];
-          nixpkgs.hostPlatform = "aarch64-linux";
-          networking.useDHCP = nixpkgs.lib.mkForce true;
-          networking.usePredictableInterfaceNames = true;
-
-          environment.etc = {
-            "nixos/flake.nix".text = builtins.readFile ./nixos/flake.nix;
-            "nixos/configuration.nix".text = builtins.readFile ./nixos/configuration.nix;
-            "nixos/hardware-configuration.nix".text = builtins.readFile ./nixos/hardware-configuration.nix;
-          };
-        })
-      ];
-    };
+        };
+      in
+      systemConfig.config.system.build.images.qcow2; 
   };
 }
