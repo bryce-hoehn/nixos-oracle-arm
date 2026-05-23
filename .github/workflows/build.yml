@@ -55,5 +55,5 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v3
       with:
-        files: nixos-oci-arm64-qcow2.zip
+        files: nixos-oracle-qcow2.zip
         tag_name: v${{env.DATE}}
