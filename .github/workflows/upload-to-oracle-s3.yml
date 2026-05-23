@@ -1,0 +1,81 @@
+name: Upload Latest Release to Oracle S3
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Get latest release info
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LATEST_RELEASE=$(gh release view --json tagName,assets --jq '{tag: .tagName, asset: (.assets[] | select(.name | endswith(".zip")) | .url)}')
+          TAG=$(echo "$LATEST_RELEASE" | jq -r '.tag')
+          ASSET_URL=$(echo "$LATEST_RELEASE" | jq -r '.asset')
+
+          if [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
+            echo "ERROR: No zip asset found in latest release"
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "asset_url=$ASSET_URL" >> "$GITHUB_OUTPUT"
+          echo "Latest release: $TAG"
+          echo "Asset URL: $ASSET_URL"
+
+      - name: Download release artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ steps.release.outputs.tag }}" \
+            --pattern '*.zip' \
+            --dir ./artifact
+
+      - name: Unzip QCOW2 artifact
+        run: |
+          cd ./artifact
+          unzip -o '*.zip' '*.qcow2'
+          echo "--- Extracted QCOW2 files ---"
+          find . -name '*.qcow2' -exec ls -lh {} \;
+
+      - name: Configure AWS CLI for Oracle S3
+        run: |
+          aws configure set aws_access_key_id "${{ secrets.OCI_S3_ACCESS_KEY }}"
+          aws configure set aws_secret_access_key "${{ secrets.OCI_S3_SECRET_KEY }}"
+          aws configure set default.region "${{ secrets.OCI_S3_REGION }}"
+
+      - name: Upload to Oracle S3
+        run: |
+          ENDPOINT="${{ secrets.OCI_S3_ENDPOINT }}"
+          BUCKET="${{ secrets.OCI_S3_BUCKET }}"
+          DEST_PREFIX="${{ secrets.OCI_S3_DEST_PREFIX }}"
+
+          echo "Uploading QCOW2 images to Oracle S3..."
+          echo "  Endpoint: $ENDPOINT"
+          echo "  Bucket:   $BUCKET"
+          echo "  Prefix:   ${DEST_PREFIX:-<root>}"
+
+          find ./artifact -name '*.qcow2' | while read -r FILE; do
+            FILENAME=$(basename "$FILE")
+
+            if [ -n "$DEST_PREFIX" ]; then
+              S3_KEY="${DEST_PREFIX}/${FILENAME}"
+            else
+              S3_KEY="${FILENAME}"
+            fi
+
+            echo "Uploading ${FILENAME} -> s3://${BUCKET}/${S3_KEY}"
+            aws s3 cp "$FILE" "s3://${BUCKET}/${S3_KEY}" \
+              --endpoint-url "$ENDPOINT" \
+              --no-progress
+          done
+
+          echo "Upload complete."
