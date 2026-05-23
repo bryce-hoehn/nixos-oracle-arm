@@ -8,15 +8,11 @@ on:
       username:
         description: 'Admin username'
         required: false
-        default: 'opc'
+        default: 'changeme'
       hostname:
         description: 'System hostname'
         required: false
-        default: 'oci-nixos-arm'
-      timezone:
-        description: 'System timezone'
-        required: false
-        default: 'UTC'
+        default: 'oracle'
       ssh_key:
         description: 'SSH Public Key'
         required: false
@@ -34,7 +30,6 @@ jobs:
         
         # 1. Update Target configuration.nix in /nixos via comment targeting
         sed -i '/# TARGET_HOSTNAME/c\  networking.hostName = "${{ github.event.inputs.hostname }}"; # TARGET_HOSTNAME' nixos/configuration.nix
-        sed -i '/# TARGET_TIMEZONE/c\  time.timeZone = "${{ github.event.inputs.timezone }}"; # TARGET_TIMEZONE' nixos/configuration.nix
         sed -i '/# TARGET_USERNAME/c\    user = "${{ github.event.inputs.username }}"; # TARGET_USERNAME' nixos/configuration.nix
         sed -i '/# TARGET_DESCRIPTION/c\      description = "${{ github.event.inputs.username }} Admin User"; # TARGET_DESCRIPTION' nixos/configuration.nix
         sed -i '/# TARGET_SSH_KEY/c\        "${{ github.event.inputs.ssh_key }}" # TARGET_SSH_KEY' nixos/configuration.nix
@@ -51,7 +46,7 @@ jobs:
           
     - name: Build QCOW2 Image
       run: |
-        nix build .#oci-arm64 --print-build-logs
+        nix build .#oracle --print-build-logs
 
     - name: Get date
       run: |
