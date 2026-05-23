@@ -14,18 +14,18 @@
             ./nixos/configuration.nix
 
             ({ pkgs, lib, ... }: {
+              
               services.cloud-init.enable = true;
 
               nixpkgs.overlays = [
-                # Strips the "kvm" feature restriction for the runner
+                # strips the "kvm" feature restriction for the runner
                 (final: prev: {
                   nixos-disk-image = prev.nixos-disk-image.overrideAttrs (oldAttrs: {
                     requiredSystemFeatures = [ ];
                   });
                 })
 
-                # resolves OOM error
-                # credit: https://github.com/nix-community/nixos-generators/issues/443#issuecomment-3697547318
+                # https://github.com/nix-community/nixos-generators/issues/443#issuecomment-3697547318
                 (final: prev: {
                   lkl = prev.lkl.overrideAttrs (old: {
                     postPatch = (old.postPatch or "") + ''
@@ -36,6 +36,10 @@
                 })
               ];
 
+              nixpkgs.hostPlatform = "aarch64-linux";
+              networking.useDHCP = lib.mkForce true;
+              networking.usePredictableInterfaceNames = true;
+
               environment.etc = {
                 "nixos/flake.nix".text = builtins.readFile ./flake.nix;
                 "nixos/configuration.nix".text = builtins.readFile ./nixos/configuration.nix;
@@ -45,6 +49,6 @@
           ];
         };
       in
-      systemConfig.config.system.build.image;
+      systemConfig.config.system.build.image; 
   };
 }
