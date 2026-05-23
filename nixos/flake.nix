@@ -6,7 +6,6 @@
   };
 
   outputs = { self, nixpkgs, ... }@inputs: {
-    # TARGET_FLAKE_CONFIG
     nixosConfigurations.oracle = nixpkgs.lib.nixosSystem {
       system = "aarch64-linux";
       modules = [
