@@ -113,7 +113,6 @@ jobs:
       #   OCI_COMPARTMENT_OCID   - OCID of the compartment to import the image into
       #   OCI_API_KEY_PRIVATE    - PEM-formatted RSA private key for API authentication
       #   OCI_API_KEY_FINGERPRINT - Fingerprint of the API key
-      #   OCI_IMAGE_LAUNCH_MODE  - (optional) NATIVE, PARAVIRTUALIZED, EMULATED; defaults to PARAVIRTUALIZED
       #
       # The import steps only run when OCI_COMPARTMENT_OCID is set as a secret.
 
@@ -154,11 +153,7 @@ jobs:
           DEST_PREFIX="${{ secrets.OCI_S3_DEST_PREFIX }}"
           COMPARTMENT="${{ secrets.OCI_COMPARTMENT_OCID }}"
           ENDPOINT="${{ secrets.OCI_S3_ENDPOINT }}"
-          LAUNCH_MODE="${{ secrets.OCI_IMAGE_LAUNCH_MODE }}"
           TAG="${{ steps.release.outputs.tag }}"
-
-          # Default launch mode for ARM64 VMs (Ampere A1)
-          LAUNCH_MODE="${LAUNCH_MODE:-PARAVIRTUALIZED}"
 
           # Extract Object Storage namespace from the S3-compatible endpoint
           # Format: https://<namespace>.compat.objectstorage.<region>.oci.oraclecloud.com
@@ -173,7 +168,6 @@ jobs:
           echo "  Namespace:   $NAMESPACE"
           echo "  Bucket:      $BUCKET"
           echo "  Compartment: $COMPARTMENT"
-          echo "  Launch mode: $LAUNCH_MODE"
 
           find ./artifact -name '*.qcow2' | while read -r FILE; do
             FILENAME=$(basename "$FILE")
@@ -221,7 +215,7 @@ jobs:
               --compartment-id "$COMPARTMENT" \
               --display-name "$DISPLAY_NAME" \
               --source-image-type QCOW2 \
-              --launch-mode "$LAUNCH_MODE" \
+              --launch-mode PARAVIRTUALIZED \
               --operating-system "Linux" \
               --operating-system-version "NixOS" \
               --query 'data.id' \

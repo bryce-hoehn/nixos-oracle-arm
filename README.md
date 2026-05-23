@@ -67,7 +67,6 @@ oci iam availability-domain list --compartment-id <compartment-ocid>
 | `OCI_USER_OCID` | OCID of the OCI user with compute image import permissions |
 | `OCI_API_KEY_PRIVATE` | PEM-formatted RSA private key for OCI API authentication |
 | `OCI_API_KEY_FINGERPRINT` | Fingerprint of the API key (e.g. `aa:bb:cc:...`) |
-| `OCI_IMAGE_LAUNCH_MODE` | (Optional) Launch mode: `PARAVIRTUALIZED` (default), `NATIVE`, or `EMULATED` |
 
 ### Setting up OCI API authentication
 
