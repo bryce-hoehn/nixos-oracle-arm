@@ -17,17 +17,24 @@
               services.cloud-init.enable = true;
 
               nixpkgs.overlays = [
+                # Strips the "kvm" feature restriction for the runner
                 (final: prev: {
-                  # Strips the "kvm" requirement so it compiles cleanly on non-KVM ARM64 runners
                   nixos-disk-image = prev.nixos-disk-image.overrideAttrs (oldAttrs: {
                     requiredSystemFeatures = [ ];
                   });
                 })
-              ];
 
-              nixpkgs.hostPlatform = "aarch64-linux";
-              networking.useDHCP = lib.mkForce true;
-              networking.usePredictableInterfaceNames = true;
+                # resolves OOM error
+                # credit: https://github.com/nix-community/nixos-generators/issues/443#issuecomment-3697547318
+                (final: prev: {
+                  lkl = prev.lkl.overrideAttrs (old: {
+                    postPatch = (old.postPatch or "") + ''
+                      substituteInPlace tools/lkl/cptofs.c \
+                        --replace-fail 'lkl_start_kernel("mem=100M")' 'lkl_start_kernel("mem=1024M")'
+                    '';
+                  });
+                })
+              ];
 
               environment.etc = {
                 "nixos/flake.nix".text = builtins.readFile ./flake.nix;
