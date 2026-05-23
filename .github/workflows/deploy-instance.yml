@@ -1,0 +1,200 @@
+name: Deploy NixOS Instance
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_name:
+        description: "Display name for the compute instance"
+        required: true
+        type: string
+      availability_domain:
+        description: "Availability domain (e.g. zXrW:US-ASHBURN-AD-1). Run 'oci iam availability-domain list' to find yours."
+        required: true
+        type: string
+      ocpus:
+        description: "Number of OCPUs (1-4 for A1.Flex Always Free)"
+        required: true
+        type: number
+        default: 2
+      memory_in_gbs:
+        description: "Memory in GB (1-24 for A1.Flex Always Free)"
+        required: true
+        type: number
+        default: 12
+      boot_volume_size_in_gbs:
+        description: "Boot volume size in GB"
+        required: true
+        type: number
+        default: 50
+      ssh_public_key:
+        description: "SSH public key to authorize on the instance"
+        required: true
+        type: string
+      create_network:
+        description: "Create a new VCN + public subnet (uncheck to use an existing subnet)"
+        required: true
+        type: boolean
+        default: true
+      subnet_ocid:
+        description: "OCID of an existing subnet (only needed when create_network is false)"
+        required: false
+        type: string
+      image_ocid:
+        description: "OCID of the custom image (leave blank to auto-detect the latest imported image)"
+        required: false
+        type: string
+      max_retries:
+        description: "Maximum number of provisioning attempts (Oracle A1 capacity is limited)"
+        required: true
+        type: number
+        default: 100
+      retry_delay_seconds:
+        description: "Seconds to wait between retries"
+        required: true
+        type: number
+        default: 120
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.9"
+
+      - name: Install OCI CLI
+        run: pip install oci-cli
+
+      - name: Configure OCI CLI
+        run: |
+          mkdir -p ~/.oci
+
+          cat > ~/.oci/config <<EOF
+          [DEFAULT]
+          user=${{ secrets.OCI_USER_OCID }}
+          fingerprint=${{ secrets.OCI_API_KEY_FINGERPRINT }}
+          tenancy=${{ secrets.OCI_TENANCY_OCID }}
+          region=${{ secrets.OCI_S3_REGION }}
+          key_file=~/.oci/oci_api_key.pem
+          EOF
+
+          echo "${{ secrets.OCI_API_KEY_PRIVATE }}" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+
+      - name: Resolve image OCID
+        id: image
+        run: |
+          if [ -n "${{ inputs.image_ocid }}" ]; then
+            echo "Using manually specified image: ${{ inputs.image_ocid }}"
+            echo "id=${{ inputs.image_ocid }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Auto-detecting latest custom image..."
+            IMAGE_ID=$(oci compute image list \
+              --compartment-id "${{ secrets.OCI_COMPARTMENT_OCID }}" \
+              --lifecycle-state AVAILABLE \
+              --sort-by TIMECREATED \
+              --sort-order DESC \
+              --all \
+              --query "data[0].id" \
+              --raw-output)
+
+            if [ -z "$IMAGE_ID" ] || [ "$IMAGE_ID" = "null" ]; then
+              echo "ERROR: No custom images found in compartment. Import an image first."
+              exit 1
+            fi
+
+            echo "Latest image: $IMAGE_ID"
+            echo "id=$IMAGE_ID" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Terraform Init
+        run: |
+          ENDPOINT="${{ secrets.OCI_S3_ENDPOINT }}"
+          BUCKET="${{ secrets.OCI_S3_BUCKET }}"
+
+          cd terraform
+          terraform init \
+            -backend-config="endpoint=${ENDPOINT}" \
+            -backend-config="region=${{ secrets.OCI_S3_REGION }}" \
+            -backend-config="bucket=${BUCKET}" \
+            -backend-config="key=terraform/deploy-instance.tfstate" \
+            -backend-config="access_key=${{ secrets.OCI_S3_ACCESS_KEY }}" \
+            -backend-config="secret_key=${{ secrets.OCI_S3_SECRET_KEY }}"
+
+      - name: Terraform Apply (with retry on capacity errors)
+        id: apply
+        run: |
+          MAX_RETRIES=${{ inputs.max_retries }}
+          RETRY_DELAY=${{ inputs.retry_delay_seconds }}
+          ATTEMPT=0
+
+          while [ $ATTEMPT -lt $MAX_RETRIES ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "--- Attempt $ATTEMPT of $MAX_RETRIES ---"
+
+            cd terraform
+            if terraform apply -auto-approve \
+              -var="tenancy_ocid=${{ secrets.OCI_TENANCY_OCID }}" \
+              -var="user_ocid=${{ secrets.OCI_USER_OCID }}" \
+              -var="api_key_fingerprint=${{ secrets.OCI_API_KEY_FINGERPRINT }}" \
+              -var="api_key_path=$HOME/.oci/oci_api_key.pem" \
+              -var="region=${{ secrets.OCI_S3_REGION }}" \
+              -var="compartment_ocid=${{ secrets.OCI_COMPARTMENT_OCID }}" \
+              -var="availability_domain=${{ inputs.availability_domain }}" \
+              -var="instance_name=${{ inputs.instance_name }}" \
+              -var="image_id=${{ steps.image.outputs.id }}" \
+              -var="ssh_public_key=${{ inputs.ssh_public_key }}" \
+              -var="ocpus=${{ inputs.ocpus }}" \
+              -var="memory_in_gbs=${{ inputs.memory_in_gbs }}" \
+              -var="boot_volume_size_in_gbs=${{ inputs.boot_volume_size_in_gbs }}" \
+              -var="create_network=${{ inputs.create_network }}" \
+              -var="subnet_ocid=${{ inputs.subnet_ocid }}"; then
+              echo "Terraform apply succeeded on attempt $ATTEMPT."
+              cd ..
+              exit 0
+            fi
+
+            cd ..
+            echo "Terraform apply failed on attempt $ATTEMPT."
+
+            if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+              echo "Retrying in ${RETRY_DELAY}s..."
+              sleep "$RETRY_DELAY"
+            fi
+          done
+
+          echo "ERROR: Terraform apply failed after $MAX_RETRIES attempts."
+          exit 1
+
+      - name: Capture outputs
+        id: outputs
+        run: |
+          cd terraform
+          PUBLIC_IP=$(terraform output -raw instance_public_ip)
+          INSTANCE_ID=$(terraform output -raw instance_ocid)
+          echo "public_ip=$PUBLIC_IP" >> "$GITHUB_OUTPUT"
+          echo "instance_id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+          echo "Public IP: $PUBLIC_IP"
+          echo "Instance OCID: $INSTANCE_ID"
+
+      - name: Summary
+        run: |
+          PUBLIC_IP="${{ steps.outputs.outputs.public_ip }}"
+          echo "### Deployed Instance" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Property | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|----------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Name | \`${{ inputs.instance_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Public IP | \`${PUBLIC_IP}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| OCID | \`${{ steps.outputs.outputs.instance_id }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image | \`${{ steps.image.outputs.id }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Shape | VM.Standard.A1.Flex (${{ inputs.ocpus }} OCPU, ${{ inputs.memory_in_gbs }} GB RAM) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Boot Volume | ${{ inputs.boot_volume_size_in_gbs }} GB |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| AD | ${{ inputs.availability_domain }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Connect with: \`ssh root@${PUBLIC_IP}\`" >> "$GITHUB_STEP_SUMMARY"
