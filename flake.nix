@@ -10,7 +10,7 @@
   };
 
   outputs = { self, nixpkgs, nixos-generators, ... }: {
-    packages.aarch64-linux.oci-arm64 = nixos-generators.nixosGenerate {
+    packages.aarch64-linux.oracle = nixos-generators.nixosGenerate {
       pkgs = nixpkgs.legacyPackages.aarch64-linux;
       format = "qcow";
 
