@@ -4,16 +4,16 @@ NixOS QCOW2 image builder for Oracle Cloud ARM64 (Ampere) instances.
 
 ## GitHub Actions Workflows
 
-### Upload to Oracle S3 + Import Image
+### Upload to OCI + Import Image
 
-The [`upload-to-oracle-s3.yml`](.github/workflows/upload-to-oracle-s3.yml) workflow is triggered on release publication (or manually via `workflow_dispatch`). It:
+The [`upload-to-oci.yml`](.github/workflows/upload-to-oci.yml) workflow is triggered on release publication (or manually via `workflow_dispatch`). It:
 
-1. Downloads the QCOW2 image from the latest GitHub release
+1. Downloads the QCOW2 image from the latest GitHub release (supports both `.zip` and `.tar.gz` archives)
 2. Uploads it to an Oracle Cloud Object Storage bucket via the S3-compatible API
 3. **(Optional)** Automatically imports the image as a custom compute image in OCI
 4. **(Optional)** Cleans up old images and bucket objects
 
-The image import step is **opt-in** — it only runs if you configure the `OCI_COMPARTMENT_OCID` secret. Without it, the workflow stops after the S3 upload (matching the original behavior).
+The image import step is **opt-in** — it only runs if you configure the `OCI_COMPARTMENT_OCID` secret. Without it, the workflow stops after the S3 upload.
 
 ### Deploy NixOS Instance
 
@@ -98,7 +98,7 @@ Allow group <your-group> to manage volume-family in compartment <your-compartmen
 
 ```
 ├── .github/workflows/
-│   ├── upload-to-oracle-s3.yml   # Build → upload → import pipeline
+│   ├── upload-to-oci.yml         # Upload → import → cleanup pipeline
 │   └── deploy-instance.yml       # Terraform deploy workflow
 ├── terraform/
 │   └── main.tf                   # OCI instance Terraform config

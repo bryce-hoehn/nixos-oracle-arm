@@ -1,64 +1,56 @@
-name: Build Custom NixOS OCI ARM64 Image
+name: Build Oracle OCI ARM64 (qemu-efi) Image
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '00 03 * * 1'
-  workflow_dispatch:
-    inputs:
-      username:
-        description: 'Admin username'
-        required: false
-        default: 'opc'
-      hostname:
-        description: 'System hostname'
-        required: false
-        default: 'oci-nixos-arm'
-      timezone:
-        description: 'System timezone'
-        required: false
-        default: 'UTC'
-      ssh_key:
-        description: 'SSH Public Key'
-        required: false
 
 jobs:
   build:
     runs-on: ubuntu-24.04-arm
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v6
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-    - name: Dynamically Update Configuration Files
-      run: |
-        echo "Injecting parameters via persistent placeholders..."
-        
-        # 1. Update Target configuration.nix in /nixos via comment targeting
-        sed -i '/# TARGET_HOSTNAME/c\  networking.hostName = "${{ github.event.inputs.hostname }}"; # TARGET_HOSTNAME' nixos/configuration.nix
-        sed -i '/# TARGET_TIMEZONE/c\  time.timeZone = "${{ github.event.inputs.timezone }}"; # TARGET_TIMEZONE' nixos/configuration.nix
-        sed -i '/# TARGET_USERNAME/c\    user = "${{ github.event.inputs.username }}"; # TARGET_USERNAME' nixos/configuration.nix
-        sed -i '/# TARGET_DESCRIPTION/c\      description = "${{ github.event.inputs.username }} Admin User"; # TARGET_DESCRIPTION' nixos/configuration.nix
-        sed -i '/# TARGET_SSH_KEY/c\        "${{ github.event.inputs.ssh_key }}" # TARGET_SSH_KEY' nixos/configuration.nix
-        
-        # 2. Update Target flake.nix using the line immediately following our anchor comment
-        # This locates the comment line, moves to the next line, and substitutes the configuration block safely
-        sed -i '/# TARGET_FLAKE_CONFIG/{n;s/nixosConfigurations\.[a-zA-Z0-9_-]*/nixosConfigurations.${{ github.event.inputs.hostname }}/}' nixos/flake.nix
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            system-features = kvm nixos-test benchmark big-parallel
 
-    - name: Install Nix
-      uses: DeterminateSystems/nix-installer-action@main
-      with:
-        extra-conf: |
-          system-features = kvm nixos-test benchmark big-parallel
-          
-    - name: Build QCOW2 Image
-      run: |
-        nix build .#oci-arm64 --print-build-logs
+      - name: Build image (qemu-efi)
+        run: |
+          set -euo pipefail
 
-    - name: Get date
-      run: |
-        echo "DATE=$(date --rfc-3339=date)" >> ${GITHUB_ENV}
-    
-    - name: Release
-      uses: softprops/action-gh-release@v3
-      with:
-        files: nixos-oci-arm64-qcow2.zip
-        tag_name: v${{env.DATE}}
+          nix build .#oracle --print-build-logs
+
+          echo "== Build output (result symlink) =="
+          readlink -f result || true
+          ls -lah result
+
+          # Produce a deterministic release artifact in the workspace.
+          # Depending on nixpkgs version, `result` may be a file OR a directory.
+          if [ -d result ]; then
+            echo "result is a directory; tarring contents"
+            tar -C result -czf nixos-oracle-qemu-efi.tar.gz .
+            echo "ARTIFACT=nixos-oracle-qemu-efi.tar.gz" >> "$GITHUB_ENV"
+          else
+            echo "result is a file; copying"
+            cp -v result nixos-oracle-qemu-efi.img
+            gzip -f nixos-oracle-qemu-efi.img
+            echo "ARTIFACT=nixos-oracle-qemu-efi.img.gz" >> "$GITHUB_ENV"
+          fi
+
+          echo "== Workspace artifacts =="
+          ls -lah
+
+      - name: Get date
+        run: |
+          echo "DATE=$(date --rfc-3339=date)" >> "$GITHUB_ENV"
+
+      - name: Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ${{ env.ARTIFACT }}
+          tag_name: v${{ env.DATE }}
