@@ -8,7 +8,6 @@
   outputs = { self, nixpkgs, ... }: {
     packages.aarch64-linux.oracle = 
       let
-        # Build the configuration using native nixpkgs libraries
         systemConfig = nixpkgs.lib.nixosSystem {
           modules = [
             "${nixpkgs}/nixos/modules/virtualisation/oci-image.nix"
