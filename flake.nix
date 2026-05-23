@@ -19,6 +19,14 @@
         ./nixos/configuration.nix
 
         ({ pkgs, ... }: {
+          nixpkgs.overlays = [
+            (final: prev: {
+              # This strips the "kvm" requirement from the final disk image generator derivation
+              nixos-disk-image = prev.nixos-disk-image.overrideAttrs (oldAttrs: {
+                requiredSystemFeatures = [ ];
+              });
+            })
+          ];
           nixpkgs.hostPlatform = "aarch64-linux";
           networking.useDHCP = nixpkgs.lib.mkForce true;
           networking.usePredictableInterfaceNames = true;
