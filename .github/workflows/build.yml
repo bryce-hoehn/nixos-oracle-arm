@@ -1,4 +1,4 @@
-name: Build Custom NixOS OCI ARM64 Image
+name: Build OCI ARM64 Image
 
 on:
   schedule:
