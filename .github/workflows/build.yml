@@ -3,40 +3,12 @@ name: Build Custom NixOS OCI ARM64 Image
 on:
   schedule:
     - cron: '00 03 * * 1'
-  workflow_dispatch:
-    inputs:
-      username:
-        description: 'Admin username'
-        required: false
-        default: 'changeme'
-      hostname:
-        description: 'System hostname'
-        required: false
-        default: 'oracle'
-      ssh_key:
-        description: 'SSH Public Key'
-        required: false
-
 jobs:
   build:
     runs-on: ubuntu-24.04-arm
     steps:
     - name: Checkout repository
       uses: actions/checkout@v6
-
-    - name: Dynamically Update Configuration Files
-      run: |
-        echo "Injecting parameters via persistent placeholders..."
-        
-        # 1. Update Target configuration.nix in /nixos via comment targeting
-        sed -i '/# TARGET_HOSTNAME/c\  networking.hostName = "${{ github.event.inputs.hostname }}"; # TARGET_HOSTNAME' nixos/configuration.nix
-        sed -i '/# TARGET_USERNAME/c\    user = "${{ github.event.inputs.username }}"; # TARGET_USERNAME' nixos/configuration.nix
-        sed -i '/# TARGET_DESCRIPTION/c\      description = "${{ github.event.inputs.username }} Admin User"; # TARGET_DESCRIPTION' nixos/configuration.nix
-        sed -i '/# TARGET_SSH_KEY/c\        "${{ github.event.inputs.ssh_key }}" # TARGET_SSH_KEY' nixos/configuration.nix
-        
-        # 2. Update Target flake.nix using the line immediately following our anchor comment
-        # This locates the comment line, moves to the next line, and substitutes the configuration block safely
-        sed -i '/# TARGET_FLAKE_CONFIG/{n;s/nixosConfigurations\.[a-zA-Z0-9_-]*/nixosConfigurations.${{ github.event.inputs.hostname }}/}' nixos/flake.nix
 
     - name: Install Nix
       uses: DeterminateSystems/nix-installer-action@main
