@@ -17,12 +17,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          LATEST_RELEASE=$(gh release view --json tagName,assets --jq '{tag: .tagName, asset: (.assets[] | select(.name | endswith(".zip")) | .url)}')
+          LATEST_RELEASE=$(gh release view --json tagName,assets --jq '{tag: .tagName, asset: (.assets[] | select(.name | endswith(".tar.gz")) | .url)}')
           TAG=$(echo "$LATEST_RELEASE" | jq -r '.tag')
           ASSET_URL=$(echo "$LATEST_RELEASE" | jq -r '.asset')
 
           if [ -z "$ASSET_URL" ] || [ "$ASSET_URL" = "null" ]; then
-            echo "ERROR: No zip asset found in latest release"
+            echo "ERROR: No tar.gz asset found in latest release"
             exit 1
           fi
 
