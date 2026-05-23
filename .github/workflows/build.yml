@@ -43,7 +43,10 @@ jobs:
 
     - name: Install Nix
       uses: DeterminateSystems/nix-installer-action@main
-
+      with:
+        extra-conf: |
+          system-features = kvm nixos-test benchmark big-parallel
+          
     - name: Build QCOW2 Image
       run: |
         nix build .#oci-arm64 --print-build-logs
