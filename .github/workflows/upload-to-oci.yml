@@ -56,24 +56,16 @@ jobs:
         run: |
           ENDPOINT="${{ secrets.OCI_S3_ENDPOINT }}"
           BUCKET="${{ secrets.OCI_S3_BUCKET }}"
-          DEST_PREFIX="${{ secrets.OCI_S3_DEST_PREFIX }}"
 
           echo "Uploading QCOW2 images to Oracle S3..."
           echo "  Endpoint: $ENDPOINT"
           echo "  Bucket:   $BUCKET"
-          echo "  Prefix:   ${DEST_PREFIX:-<root>}"
 
           find ./artifact -name '*.qcow2' | while read -r FILE; do
             FILENAME=$(basename "$FILE")
 
-            if [ -n "$DEST_PREFIX" ]; then
-              S3_KEY="${DEST_PREFIX}/${FILENAME}"
-            else
-              S3_KEY="${FILENAME}"
-            fi
-
-            echo "Uploading ${FILENAME} -> s3://${BUCKET}/${S3_KEY}"
-            aws s3 cp "$FILE" "s3://${BUCKET}/${S3_KEY}" \
+            echo "Uploading ${FILENAME} -> s3://${BUCKET}/${FILENAME}"
+            aws s3 cp "$FILE" "s3://${BUCKET}/${FILENAME}" \
               --endpoint-url "$ENDPOINT" \
               --no-progress
           done
