@@ -9,7 +9,6 @@
   boot.loader.systemd-boot.enable = true;
 
   networking.hostName = "oracle";
-  i18n.defaultLocale = "en_US.UTF-8";
 
   services.openssh.enable = true;
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
@@ -20,5 +19,5 @@
     initialPassword = "changeme";
   };
 
-  system.stateVersion = "24.05";
+  system.stateVersion = "25.11";
 }
