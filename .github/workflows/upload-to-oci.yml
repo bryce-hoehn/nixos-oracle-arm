@@ -255,8 +255,7 @@ jobs:
             # --- Delete the QCOW2 from the bucket (no longer needed) ---
             echo "Deleting ${OBJECT_NAME} from bucket ${BUCKET}..."
             aws s3 rm "s3://${BUCKET}/${OBJECT_NAME}" \
-              --endpoint-url "$ENDPOINT" \
-              --no-progress
+              --endpoint-url "$ENDPOINT"
             echo "Bucket object deleted."
           done
 
