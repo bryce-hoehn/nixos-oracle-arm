@@ -119,7 +119,7 @@ jobs:
 
           cd terraform
           terraform init \
-            -backend-config="endpoint=${ENDPOINT}" \
+            -backend-config="endpoints.s3=${ENDPOINT}" \
             -backend-config="region=${{ secrets.OCI_S3_REGION }}" \
             -backend-config="bucket=${BUCKET}" \
             -backend-config="key=terraform/deploy-instance.tfstate" \
