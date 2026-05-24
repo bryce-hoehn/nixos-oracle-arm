@@ -208,8 +208,6 @@ jobs:
             echo ""
             echo "Importing ${OBJECT_NAME} as '${DISPLAY_NAME}'..."
 
-            echo "Waiting for image import to complete (this may take several minutes)..."
-
             IMAGE_ID=$(oci compute image import from-object \
               --bucket-name "$BUCKET" \
               --namespace "$NAMESPACE" \
@@ -220,10 +218,36 @@ jobs:
               --launch-mode PARAVIRTUALIZED \
               --operating-system "Linux" \
               --operating-system-version "NixOS" \
-              --wait-for-state AVAILABLE \
-              --max-wait-seconds 1800 \
               --query 'data.id' \
               --raw-output)
+
+            echo "Image OCID: $IMAGE_ID"
+            echo "Waiting for image import to complete (this may take several minutes)..."
+
+            TIMEOUT=1800
+            ELAPSED=0
+            INTERVAL=30
+            while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
+              STATE=$(oci compute image get \
+                --image-id "$IMAGE_ID" \
+                --query 'data."lifecycle-state"' \
+                --raw-output 2>/dev/null || echo "UNKNOWN")
+              echo "  Image state: ${STATE} (${ELAPSED}s elapsed)"
+              if [ "$STATE" = "AVAILABLE" ]; then
+                break
+              fi
+              if [ "$STATE" = "FAILED" ]; then
+                echo "ERROR: Image import failed."
+                exit 1
+              fi
+              sleep "$INTERVAL"
+              ELAPSED=$((ELAPSED + INTERVAL))
+            done
+
+            if [ "$STATE" != "AVAILABLE" ]; then
+              echo "ERROR: Image did not become AVAILABLE within ${TIMEOUT}s"
+              exit 1
+            fi
 
             echo "Image ${DISPLAY_NAME} is now AVAILABLE."
             echo "  OCID: ${IMAGE_ID}"
