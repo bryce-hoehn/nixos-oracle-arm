@@ -104,23 +104,11 @@ variable "boot_volume_size_in_gbs" {
   description = "Boot volume size in GB"
 }
 
-variable "create_network" {
-  type        = bool
-  description = "Set true to create a new VCN + subnet; false to use an existing subnet"
-}
-
-variable "subnet_ocid" {
-  type        = string
-  default     = ""
-  description = "OCID of an existing subnet (required when create_network = false)"
-}
-
 # ---------------------------------------------------------------------------
-# Networking — only created when create_network = true
+# Networking
 # ---------------------------------------------------------------------------
 
 resource "oci_core_vcn" "main" {
-  count          = var.create_network ? 1 : 0
   compartment_id = var.compartment_ocid
   cidr_blocks    = ["10.0.0.0/16"]
   display_name   = "${var.instance_name}-vcn"
@@ -128,29 +116,26 @@ resource "oci_core_vcn" "main" {
 }
 
 resource "oci_core_internet_gateway" "main" {
-  count          = var.create_network ? 1 : 0
   compartment_id = var.compartment_ocid
-  vcn_id         = oci_core_vcn.main[0].id
+  vcn_id         = oci_core_vcn.main.id
   display_name   = "${var.instance_name}-igw"
   enabled        = true
 }
 
 resource "oci_core_route_table" "main" {
-  count          = var.create_network ? 1 : 0
   compartment_id = var.compartment_ocid
-  vcn_id         = oci_core_vcn.main[0].id
+  vcn_id         = oci_core_vcn.main.id
   display_name   = "${var.instance_name}-rt"
 
   route_rules {
     destination       = "0.0.0.0/0"
-    network_entity_id = oci_core_internet_gateway.main[0].id
+    network_entity_id = oci_core_internet_gateway.main.id
   }
 }
 
 resource "oci_core_security_list" "main" {
-  count          = var.create_network ? 1 : 0
   compartment_id = var.compartment_ocid
-  vcn_id         = oci_core_vcn.main[0].id
+  vcn_id         = oci_core_vcn.main.id
   display_name   = "${var.instance_name}-sl"
 
   # Allow all egress
@@ -173,22 +158,13 @@ resource "oci_core_security_list" "main" {
 }
 
 resource "oci_core_subnet" "main" {
-  count             = var.create_network ? 1 : 0
   compartment_id    = var.compartment_ocid
-  vcn_id            = oci_core_vcn.main[0].id
+  vcn_id            = oci_core_vcn.main.id
   cidr_block        = "10.0.1.0/24"
   display_name      = "${var.instance_name}-subnet"
   dns_label         = "nixossub"
-  route_table_id    = oci_core_route_table.main[0].id
-  security_list_ids = [oci_core_security_list.main[0].id]
-}
-
-# ---------------------------------------------------------------------------
-# Subnet resolution
-# ---------------------------------------------------------------------------
-
-locals {
-  subnet_id = var.create_network ? oci_core_subnet.main[0].id : var.subnet_ocid
+  route_table_id    = oci_core_route_table.main.id
+  security_list_ids = [oci_core_security_list.main.id]
 }
 
 # ---------------------------------------------------------------------------
@@ -213,7 +189,7 @@ resource "oci_core_instance" "main" {
   }
 
   create_vnic_details {
-    subnet_id = local.subnet_id
+    subnet_id = oci_core_subnet.main.id
   }
 
   metadata = {

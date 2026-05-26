@@ -7,10 +7,6 @@ on:
         description: "Display name for the compute instance"
         required: true
         type: string
-      availability_domain:
-        description: "Availability domain (e.g. us-ashburn-1)"
-        required: true
-        type: string
       ocpus:
         description: "Number of OCPUs (1-4 for A1.Flex Always Free)"
         required: true
@@ -29,19 +25,6 @@ on:
       ssh_public_key:
         description: "SSH public key to authorize on the instance"
         required: true
-        type: string
-      create_network:
-        description: "Create a new VCN + public subnet (uncheck to use an existing subnet)"
-        required: true
-        type: boolean
-        default: true
-      subnet_ocid:
-        description: "OCID of an existing subnet (only needed when create_network is false)"
-        required: false
-        type: string
-      image_ocid:
-        description: "OCID of the custom image (leave blank to auto-detect the latest imported image)"
-        required: false
         type: string
       max_retries:
         description: "Maximum number of provisioning attempts (Oracle A1 capacity is limited)"
@@ -65,7 +48,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "~> 1.9"
+          terraform_version: "~> 1.5.0"
 
       - name: Install OCI CLI
         run: pip install oci-cli
@@ -86,31 +69,44 @@ jobs:
           echo "${{ secrets.OCI_API_KEY_PRIVATE }}" > ~/.oci/oci_api_key.pem
           chmod 600 ~/.oci/oci_api_key.pem
 
+      - name: Resolve availability domain
+        id: ad
+        run: |
+          echo "Auto-detecting first availability domain..."
+          AD_NAME=$(oci iam availability-domain list \
+            --compartment-id "${{ secrets.OCI_TENANCY_OCID }}" \
+            --region "${{ secrets.OCI_S3_REGION }}" \
+            --query "data[0].name" \
+            --raw-output)
+
+          if [ -z "$AD_NAME" ] || [ "$AD_NAME" = "null" ]; then
+            echo "ERROR: No availability domains found."
+            exit 1
+          fi
+
+          echo "Resolved AD: $AD_NAME"
+          echo "name=$AD_NAME" >> "$GITHUB_OUTPUT"
+
       - name: Resolve image OCID
         id: image
         run: |
-          if [ -n "${{ inputs.image_ocid }}" ]; then
-            echo "Using manually specified image: ${{ inputs.image_ocid }}"
-            echo "id=${{ inputs.image_ocid }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "Auto-detecting latest custom image..."
-            IMAGE_ID=$(oci compute image list \
-              --compartment-id "${{ secrets.OCI_COMPARTMENT_OCID }}" \
-              --lifecycle-state AVAILABLE \
-              --sort-by TIMECREATED \
-              --sort-order DESC \
-              --all \
-              --query "data[0].id" \
-              --raw-output)
+          echo "Auto-detecting latest custom image..."
+          IMAGE_ID=$(oci compute image list \
+            --compartment-id "${{ secrets.OCI_COMPARTMENT_OCID }}" \
+            --lifecycle-state AVAILABLE \
+            --sort-by TIMECREATED \
+            --sort-order DESC \
+            --all \
+            --query "data[0].id" \
+            --raw-output)
 
-            if [ -z "$IMAGE_ID" ] || [ "$IMAGE_ID" = "null" ]; then
-              echo "ERROR: No custom images found in compartment. Import an image first."
-              exit 1
-            fi
-
-            echo "Latest image: $IMAGE_ID"
-            echo "id=$IMAGE_ID" >> "$GITHUB_OUTPUT"
+          if [ -z "$IMAGE_ID" ] || [ "$IMAGE_ID" = "null" ]; then
+            echo "ERROR: No custom images found in compartment. Import an image first."
+            exit 1
           fi
+
+          echo "Latest image: $IMAGE_ID"
+          echo "id=$IMAGE_ID" >> "$GITHUB_OUTPUT"
 
       - name: Terraform Init
         run: |
@@ -145,15 +141,13 @@ jobs:
               -var="api_key_path=$HOME/.oci/oci_api_key.pem" \
               -var="region=${{ secrets.OCI_S3_REGION }}" \
               -var="compartment_ocid=${{ secrets.OCI_COMPARTMENT_OCID }}" \
-              -var="availability_domain=${{ inputs.availability_domain }}" \
+              -var="availability_domain=${{ steps.ad.outputs.name }}" \
               -var="instance_name=${{ inputs.instance_name }}" \
               -var="image_id=${{ steps.image.outputs.id }}" \
               -var="ssh_public_key=${{ inputs.ssh_public_key }}" \
               -var="ocpus=${{ inputs.ocpus }}" \
               -var="memory_in_gbs=${{ inputs.memory_in_gbs }}" \
-              -var="boot_volume_size_in_gbs=${{ inputs.boot_volume_size_in_gbs }}" \
-              -var="create_network=${{ inputs.create_network }}" \
-              -var="subnet_ocid=${{ inputs.subnet_ocid }}"; then
+              -var="boot_volume_size_in_gbs=${{ inputs.boot_volume_size_in_gbs }}"; then
               echo "Terraform apply succeeded on attempt $ATTEMPT."
               cd ..
               exit 0
@@ -195,6 +189,6 @@ jobs:
           echo "| Image | \`${{ steps.image.outputs.id }}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Shape | VM.Standard.A1.Flex (${{ inputs.ocpus }} OCPU, ${{ inputs.memory_in_gbs }} GB RAM) |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Boot Volume | ${{ inputs.boot_volume_size_in_gbs }} GB |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| AD | ${{ inputs.availability_domain }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| AD | \`${{ steps.ad.outputs.name }}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "Connect with: \`ssh root@${PUBLIC_IP}\`" >> "$GITHUB_STEP_SUMMARY"
