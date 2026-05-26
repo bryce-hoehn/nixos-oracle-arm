@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       availability_domain:
-        description: "Availability domain (e.g. zXrW:US-ASHBURN-AD-1). Run 'oci iam availability-domain list' to find yours."
+        description: "Availability domain (e.g. us-ashburn-1)"
         required: true
         type: string
       ocpus:
@@ -22,7 +22,7 @@ on:
         type: number
         default: 12
       boot_volume_size_in_gbs:
-        description: "Boot volume size in GB"
+        description: "Boot volume size in GB (50-200 for A1.Flex Always Free)"
         required: true
         type: number
         default: 50
@@ -119,7 +119,7 @@ jobs:
 
           cd terraform
           terraform init \
-            -backend-config="endpoints.s3=${ENDPOINT}" \
+            -backend-config="endpoint=${ENDPOINT}" \
             -backend-config="region=${{ secrets.OCI_S3_REGION }}" \
             -backend-config="bucket=${BUCKET}" \
             -backend-config="key=terraform/deploy-instance.tfstate" \
