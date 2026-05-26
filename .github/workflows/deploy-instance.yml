@@ -90,9 +90,10 @@ jobs:
       - name: Resolve image OCID
         id: image
         run: |
-          echo "Auto-detecting latest custom image..."
+          echo "Auto-detecting latest A1.Flex-compatible custom image..."
           IMAGE_ID=$(oci compute image list \
             --compartment-id "${{ secrets.OCI_COMPARTMENT_OCID }}" \
+            --shape "VM.Standard.A1.Flex" \
             --lifecycle-state AVAILABLE \
             --sort-by TIMECREATED \
             --sort-order DESC \
