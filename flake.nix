@@ -48,10 +48,13 @@
             networking.useDHCP = lib.mkForce true;
             networking.usePredictableInterfaceNames = true;
 
-            environment.etc = {
-              "nixos/flake.nix".text = builtins.readFile ./flake.nix;
-              "nixos/configuration.nix".text = builtins.readFile ./nixos/configuration.nix;
-              "nixos/hardware-configuration.nix".text = builtins.readFile ./nixos/hardware-configuration.nix;
+            environment.etc."nixos" = {
+              source = null; # ensure nix places the subdir contents as files
+              directory = {
+                "flake.nix".text = builtins.readFile ./flake.nix;
+                "configuration.nix".text = builtins.readFile ./nixos/configuration.nix;
+                "hardware-configuration.nix".text = builtins.readFile ./nixos/hardware-configuration.nix;
+              };
             };
           })
         ];
